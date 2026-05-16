@@ -3,14 +3,22 @@ import { useState, useEffect } from 'react';
 
 export default function Home() {
   const [input, setInput] = useState('');
-  const [result, setResult] = useState<any>(null);
   const [hospitals, setHospitals] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fontSize, setFontSize] = useState(24);
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
   
-  // 新增：儲存使用者位置
+  // 儲存使用者位置
   const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
+
+  // 給予 result 完整的初始結構，防止不使用 ?. 時當機
+  const [result, setResult] = useState<any>({
+    zh: { recommended_department: [], reason: "" },
+    en: { recommended_department: [], reason: "" }
+  });
+
+  // 用來控制結果區塊何時顯示
+  const [hasData, setHasData] = useState(false);
 
   // 元件掛載時請求位置權限
   useEffect(() => {
@@ -31,7 +39,7 @@ export default function Home() {
     zh: {
       title: "醫療導診助理",
       langBtn: "English",
-      sizeLabel: "字體大小調整",
+      sizeLabel: "字體大小",
       placeholder: "請描述您的不適症狀...",
       btn: "開始分析",
       analyzing: "分析中...",
@@ -40,7 +48,9 @@ export default function Home() {
       action: "分析原因：",
       mapTitle: "附近推薦醫療機構",
       distance: "距離約",
-      sizeLabels: { small: "小", large: "大" }
+      sizeLabels: { small: "小", large: "大" },
+      warningBox: "⚠️ 溫馨提示：本網站使用 Google Gemini AI 進行初步分流建議。AI 診斷結果可能存在誤差，無法取代專業醫療判斷。若症狀嚴重或緊急，請務必立即就醫尋求專業醫療協助。",
+      footerWarning: "免責聲明：本系統僅供就醫科別參考，不具備法律與醫療診斷效力。"
     },
     en: {
       title: "Medical Triage Assistant",
@@ -54,7 +64,9 @@ export default function Home() {
       action: "Reasoning:",
       mapTitle: "Recommended Hospitals",
       distance: "Approx.",
-      sizeLabels: { small: "S", large: "L" }
+      sizeLabels: { small: "S", large: "L" },
+      warningBox: "⚠️ Notice: This website uses Google Gemini AI for initial medical triage. AI recommendations may contain errors and cannot replace professional medical diagnosis. If symptoms are severe or urgent, please seek professional medical care immediately.",
+      footerWarning: "Disclaimer: This system is for reference only and does not constitute formal medical or legal advice."
     }
   };
 
@@ -63,25 +75,41 @@ export default function Home() {
   const handleAnalyze = async () => {
     if (!input.trim()) return;
     setLoading(true);
+    setHasData(false); 
+    
     try {
       const res = await fetch("/api/triage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symptoms: input }),
       });
-      const data = await res.json();
-      setResult(data);
-
-      // 將位置資訊帶入 Places API
-      const specialty = data.zh.recommended_department[0];
-      let url = `/api/places?q=${specialty}`;
-      if (location) {
-        url += `&lat=${location.lat}&lng=${location.lng}`;
-      }
       
-      const placesRes = await fetch(url);
-      const placesData = await placesRes.json();
-      setHospitals(placesData);
+      const data = await res.json();
+
+      if (data && data.zh && data.zh.recommended_department) {
+        setResult(data);
+        setHasData(true);
+
+        const specialty = data.zh.recommended_department[0] || "一般內科";
+        let url = `/api/places?q=${encodeURIComponent(specialty)}`;
+        if (location) {
+          url += `&lat=${location.lat}&lng=${location.lng}`;
+        }
+        
+        const placesRes = await fetch(url);
+        const placesData = await placesRes.json();
+        
+        const sortedHospitals = placesData.sort((a: any, b: any) => {
+          const distA = parseFloat(a.distance || '0');
+          const distB = parseFloat(b.distance || '0');
+          return distA - distB;
+        });
+
+        setHospitals(sortedHospitals);
+      } else {
+        console.error("後端回傳格式不正確:", data);
+      }
+
     } catch (error) {
       console.error(error);
     } finally {
@@ -90,49 +118,56 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen p-6 md:p-12 bg-[#F9F7F2] text-[#4A3F6B] transition-all font-sans tracking-tight">
-      <div className="max-w-3xl mx-auto">
+    <main className="min-h-screen p-4 md:p-12 bg-[#F9F7F2] text-[#4A3F6B] transition-all font-sans tracking-tight flex flex-col justify-between">
+      <div className="max-w-3xl mx-auto w-full flex-1">
         
         {/* 控制列 */}
-        <div className="flex flex-col md:flex-row justify-between items-center mb-10 bg-[#B8B2C7] p-5 md:p-7 rounded-[2.5rem] shadow-sm gap-6">
-          <div className="flex items-center gap-6 w-full md:w-auto">
-            <span className="text-xl md:text-2xl font-black text-[#4A3F6B] whitespace-nowrap">
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-6 md:mb-10 bg-[#B8B2C7] p-4 sm:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm gap-4 md:gap-6">
+          <div className="flex items-center gap-4 w-full sm:w-auto">
+            <span className="text-lg md:text-2xl font-black text-[#4A3F6B] whitespace-nowrap">
               {currentT.sizeLabel}
             </span>
-            <div className="flex flex-1 items-center gap-4 bg-white/40 px-6 py-3 rounded-2xl">
-              <span className="text-sm font-bold text-[#4A3F6B]">{currentT.sizeLabels.small}</span>
+            <div className="flex flex-1 items-center gap-3 bg-white/40 px-4 py-2 rounded-xl">
+              <span className="text-xs font-bold text-[#4A3F6B]">{currentT.sizeLabels.small}</span>
               <input 
                 type="range" min="16" max="40" value={fontSize} 
                 onChange={(e) => setFontSize(Number(e.target.value))}
-                className="accent-[#E89A71] cursor-pointer flex-1 h-3"
+                className="accent-[#E89A71] cursor-pointer flex-1 h-2"
               />
-              <span className="text-2xl font-black text-[#4A3F6B]">{currentT.sizeLabels.large}</span>
+              <span className="text-xl font-black text-[#4A3F6B]">{currentT.sizeLabels.large}</span>
             </div>
           </div>
           <button 
             onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')}
-            className="w-full md:w-auto bg-[#4A3F6B] hover:bg-[#352D52] text-white text-lg font-black py-3 px-10 rounded-2xl transition-all shadow-md active:scale-95"
+            className="w-full sm:w-auto bg-[#4A3F6B] hover:bg-[#352D52] text-white text-base md:text-lg font-black py-2.5 sm:py-3 px-8 sm:px-10 rounded-xl md:rounded-2xl transition-all shadow-md active:scale-95"
           >
             {currentT.langBtn}
           </button>
         </div>
 
-        <h1 className="text-4xl font-black mb-12 text-center text-[#4A3F6B]">
+        {/* 主標題 */}
+        <h1 className="text-3xl md:text-4xl font-black mb-8 md:text-center text-[#4A3F6B]">
           {currentT.title}
         </h1>
         
         {/* 輸入區域 */}
-        <div className="bg-[#F1EDE4] p-8 rounded-[3rem] mb-10 border border-[#E2DCD0]">
+        <div className="bg-[#F1EDE4] p-5 md:p-8 rounded-[1.5rem] md:rounded-[3rem] mb-6 md:mb-10 border border-[#E2DCD0]">
           <textarea 
-            style={{ fontSize: `${fontSize}px` }}
-            className="w-full bg-white/95 p-7 rounded-[2rem] outline-none min-h-[160px] transition-all shadow-inner text-gray-800 placeholder:text-gray-300 border-none"
+            style={{ fontSize: `${Math.min(fontSize, typeof window !== 'undefined' && window.innerWidth < 768 ? 28 : 40)}px` }}
+            className="w-full bg-white/95 p-4 md:p-7 rounded-[1rem] md:rounded-[2rem] outline-none min-h-[140px] md:min-h-[160px] transition-all shadow-inner text-gray-800 placeholder:text-gray-300 border-none resize-none"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={currentT.placeholder}
           />
+          
+          {/* 💡 調整：加入 text-center 讓警示區塊文字水平置中 */}
+          <div className="mt-4 p-4 bg-[#E89A71]/10 rounded-xl md:rounded-2xl border border-[#E89A71]/30 text-xs md:text-sm text-[#D68961] font-medium leading-relaxed text-center">
+            {currentT.warningBox}
+          </div>
+
           <button 
             onClick={handleAnalyze}
-            className="w-full mt-6 bg-[#E89A71] text-white py-5 rounded-[2rem] text-2xl font-black shadow-lg shadow-[#E89A71]/30 hover:bg-[#D68961] transition-all disabled:bg-gray-300"
+            className="w-full mt-4 bg-[#E89A71] text-white py-4 md:py-5 rounded-[1.25rem] md:rounded-[2rem] text-xl md:text-2xl font-black shadow-lg shadow-[#E89A71]/30 hover:bg-[#D68961] transition-all disabled:bg-gray-300 active:scale-[0.98]"
             disabled={loading}
           >
             {loading ? currentT.analyzing : currentT.btn}
@@ -140,47 +175,51 @@ export default function Home() {
         </div>
 
         {/* 結果區域 */}
-        {result && (
-          <div className="space-y-8 animate-in fade-in zoom-in-95 duration-700">
-            <div className="bg-[#F1EDE4] rounded-[3.5rem] p-10 shadow-sm border border-[#E2DCD0]">
-              <h2 className="text-2xl font-black text-[#E89A71] mb-8 flex items-center gap-3">
-                <span className="w-3 h-8 bg-[#E89A71] rounded-full"></span>
+        {hasData && (
+          <div className="space-y-6 md:space-y-8 animate-in fade-in zoom-in-95 duration-700 mb-10">
+            <div className="bg-[#F1EDE4] rounded-[1.5rem] md:rounded-[3.5rem] p-5 md:p-10 shadow-sm border border-[#E2DCD0]">
+              <h2 className="text-xl md:text-2xl font-black text-[#E89A71] mb-6 flex items-center gap-3">
+                <span className="w-2 md:w-3 h-6 md:h-8 bg-[#E89A71] rounded-full"></span>
                 {currentT.resultTitle}
               </h2>
               
-              <div style={{ fontSize: `${fontSize}px` }} className="leading-relaxed">
-                <p className="mb-8 text-[#4A3F6B] font-medium">
-                  {currentT.dept}
-                  <span className="ml-4 px-6 py-1.5 bg-[#E89A71] text-white rounded-2xl font-black inline-block shadow-md">
+              <div style={{ fontSize: `${Math.min(fontSize, typeof window !== 'undefined' && window.innerWidth < 768 ? 26 : 40)}px` }} className="leading-relaxed">
+                <div className="mb-6 text-[#4A3F6B] font-medium flex flex-wrap items-center gap-2">
+                  <span>{currentT.dept}</span>
+                  <span className="px-4 py-1.5 bg-[#E89A71] text-white rounded-xl md:rounded-2xl font-black inline-block shadow-md text-base md:text-xl">
                     {result[lang].recommended_department.join(", ")}
                   </span>
-                </p>
-                <div className="bg-[#B8B2C7]/20 p-9 rounded-[2.5rem] border-l-[12px] border-[#B8B2C7]">
-                  <p className="text-[#4A3F6B] font-bold">「 {result[lang].reason} 」</p>
+                </div>
+                <div className="bg-[#B8B2C7]/20 p-5 md:p-9 rounded-[1.25rem] md:rounded-[2.5rem] border-l-[6px] md:border-l-[12px] border-[#B8B2C7]">
+                  <p className="text-[#4A3F6B] font-bold text-base md:text-lg leading-relaxed">「 {result[lang].reason} 」</p>
                 </div>
               </div>
               
-              <div className="mt-14">
-                <h3 className="text-xl font-black text-[#4A3F6B] mb-7 opacity-90">{currentT.mapTitle}</h3>
-                <div className="grid gap-5">
+              <div className="mt-10 md:mt-14">
+                <h3 className="text-lg md:text-xl font-black text-[#4A3F6B] mb-5 opacity-90">{currentT.mapTitle}</h3>
+                <div className="grid gap-4 md:gap-5">
                   {hospitals.map((h: any, i: number) => (
-                    <div key={i} className="p-7 bg-white/80 rounded-[2rem] hover:bg-white transition-all shadow-sm group border border-[#E2DCD0]">
-                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <div style={{ fontSize: `${fontSize * 0.85}px` }} className="font-black text-[#4A3F6B] group-hover:text-[#E89A71] transition-colors">
-                          {h.name}
-                        </div>
-                        {/* 評價區域：星等與數字同行 */}
-                        <div className="flex items-center gap-2 bg-[#F9F7F2] px-4 py-1.5 rounded-xl shrink-0">
-                          <span className="text-[#FFB400] text-xl">★</span>
-                          <span className="text-base font-black text-[#4A3F6B]">{h.rating || "N/A"}</span>
+                    <div key={i} className="p-4 md:p-7 bg-white/80 rounded-[1.25rem] md:rounded-[2rem] hover:bg-white transition-all shadow-sm group border border-[#E2DCD0]">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4">
+                        <a 
+                          href={h.mapUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          style={{ fontSize: `${Math.min(fontSize * 0.85, typeof window !== 'undefined' && window.innerWidth < 768 ? 20 : 35)}px` }} 
+                          className="font-black text-[#4A3F6B] hover:text-[#E89A71] hover:underline transition-colors cursor-pointer inline-flex items-center gap-1 break-all"
+                        >
+                          {h.name} 🔗
+                        </a>
+                        <div className="flex items-center gap-1.5 bg-[#F9F7F2] px-3 py-1 rounded-lg shrink-0">
+                          <span className="text-[#FFB400] text-base">★</span>
+                          <span className="text-sm font-black text-[#4A3F6B]">{h.rating || "N/A"}</span>
                         </div>
                       </div>
                       
-                      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mt-4 gap-4">
-                        <div className="text-sm text-gray-500 max-w-[80%]">{h.address}</div>
-                        {/* 距離顯示區域 */}
-                        <div className="bg-[#B8B2C7]/30 px-5 py-1.5 rounded-full text-sm font-black text-[#4A3F6B] whitespace-nowrap">
-                          {currentT.distance} {h.distance || "1.2"} km
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mt-3 sm:mt-4 gap-3 sm:gap-4">
+                        <div className="text-xs md:text-sm text-gray-500 w-full sm:max-w-[75%] break-words">{h.address}</div>
+                        <div className="bg-[#B8B2C7]/30 px-4 py-1 rounded-full text-xs md:text-sm font-black text-[#4A3F6B] whitespace-nowrap self-end sm:self-auto">
+                          {currentT.distance} {h.distance || "0.0"} km
                         </div>
                       </div>
                     </div>
@@ -191,6 +230,11 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* 💡 調整：頁尾常駐聲明已內建 text-center，這裡微調了間距讓上下對稱 */}
+      <footer className="w-full text-center py-4 text-[10px] md:text-xs text-gray-400 font-medium tracking-normal opacity-70 mt-4 shrink-0">
+        {currentT.footerWarning}
+      </footer>
     </main>
   );
 }
