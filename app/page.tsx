@@ -122,8 +122,9 @@ export default function Home() {
       <div className="max-w-3xl mx-auto w-full flex-1">
         
         {/* 控制列 */}
-        <div className="flex flex-col sm:flex-row justify-between items-center mb-6 md:mb-10 bg-[#B8B2C7] p-4 sm:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm gap-4 md:gap-6">
-          <div className="flex items-center gap-4 w-full sm:w-auto">
+        {/* 💡 修正點 1：控制列在手機版改為 items-center 且內容完全居中對齊 */}
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-6 md:mb-10 bg-[#B8B2C7] p-4 sm:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm gap-4 md:gap-6 text-center">
+          <div className="flex items-center justify-center gap-4 w-full sm:w-auto">
             <span className="text-lg md:text-2xl font-black text-[#4A3F6B] whitespace-nowrap">
               {currentT.sizeLabel}
             </span>
@@ -146,7 +147,8 @@ export default function Home() {
         </div>
 
         {/* 主標題 */}
-        <h1 className="text-3xl md:text-4xl font-black mb-8 md:text-center text-[#4A3F6B]">
+        {/* 💡 修正點 2：移除 md:text-center，直接改為 text-center，確保手持與桌面裝置全部強制置中 */}
+        <h1 className="text-3xl md:text-4xl font-black mb-8 text-center text-[#4A3F6B]">
           {currentT.title}
         </h1>
         
@@ -154,13 +156,14 @@ export default function Home() {
         <div className="bg-[#F1EDE4] p-5 md:p-8 rounded-[1.5rem] md:rounded-[3rem] mb-6 md:mb-10 border border-[#E2DCD0]">
           <textarea 
             style={{ fontSize: `${Math.min(fontSize, typeof window !== 'undefined' && window.innerWidth < 768 ? 28 : 40)}px` }}
-            className="w-full bg-white/95 p-4 md:p-7 rounded-[1rem] md:rounded-[2rem] outline-none min-h-[140px] md:min-h-[160px] transition-all shadow-inner text-gray-800 placeholder:text-gray-300 border-none resize-none"
+            // 💡 修正點 3：加入 text-center 讓輸入框文字及 placeholder 提示字皆完全置中，適合長輩單手握持閱讀
+            className="w-full bg-white/95 p-4 md:p-7 rounded-[1rem] md:rounded-[2rem] outline-none min-h-[140px] md:min-h-[160px] transition-all shadow-inner text-gray-800 placeholder:text-gray-300 border-none resize-none text-center"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={currentT.placeholder}
           />
           
-          {/* 💡 調整：加入 text-center 讓警示區塊文字水平置中 */}
+          {/* 溫馨提示區塊 (已維持置中) */}
           <div className="mt-4 p-4 bg-[#E89A71]/10 rounded-xl md:rounded-2xl border border-[#E89A71]/30 text-xs md:text-sm text-[#D68961] font-medium leading-relaxed text-center">
             {currentT.warningBox}
           </div>
@@ -178,25 +181,34 @@ export default function Home() {
         {hasData && (
           <div className="space-y-6 md:space-y-8 animate-in fade-in zoom-in-95 duration-700 mb-10">
             <div className="bg-[#F1EDE4] rounded-[1.5rem] md:rounded-[3.5rem] p-5 md:p-10 shadow-sm border border-[#E2DCD0]">
-              <h2 className="text-xl md:text-2xl font-black text-[#E89A71] mb-6 flex items-center gap-3">
+              
+              {/* 💡 修正點 4：AI 診斷建議的大標題改為 justify-center，讓小圓柱跟標題文字在所有螢幕上一同置中 */}
+              <h2 className="text-xl md:text-2xl font-black text-[#E89A71] mb-6 flex items-center justify-center gap-3">
                 <span className="w-2 md:w-3 h-6 md:h-8 bg-[#E89A71] rounded-full"></span>
                 {currentT.resultTitle}
               </h2>
               
               <div style={{ fontSize: `${Math.min(fontSize, typeof window !== 'undefined' && window.innerWidth < 768 ? 26 : 40)}px` }} className="leading-relaxed">
-                <div className="mb-6 text-[#4A3F6B] font-medium flex flex-wrap items-center gap-2">
+                
+                {/* 💡 修正點 5：科別建議欄位改為 justify-center 與 text-center，讓推薦的橘色科別標籤完美居中 */}
+                <div className="mb-6 text-[#4A3F6B] font-medium flex flex-wrap items-center justify-center gap-2 text-center">
                   <span>{currentT.dept}</span>
                   <span className="px-4 py-1.5 bg-[#E89A71] text-white rounded-xl md:rounded-2xl font-black inline-block shadow-md text-base md:text-xl">
                     {result[lang].recommended_department.join(", ")}
                   </span>
                 </div>
-                <div className="bg-[#B8B2C7]/20 p-5 md:p-9 rounded-[1.25rem] md:rounded-[2.5rem] border-l-[6px] md:border-l-[12px] border-[#B8B2C7]">
+                
+                {/* 💡 修正點 6：原因內容區塊將左邊粗邊框改為「上方粗邊框 (border-t-[6px])」，並加上 text-center，解決了手機版左側粗邊框在文字置中時視覺上的不對稱感 */}
+                <div className="bg-[#B8B2C7]/20 p-5 md:p-9 rounded-[1.25rem] md:rounded-[2.5rem] border-t-[6px] md:border-t-[12px] border-[#B8B2C7] text-center">
                   <p className="text-[#4A3F6B] font-bold text-base md:text-lg leading-relaxed">「 {result[lang].reason} 」</p>
                 </div>
               </div>
               
               <div className="mt-10 md:mt-14">
-                <h3 className="text-lg md:text-xl font-black text-[#4A3F6B] mb-5 opacity-90">{currentT.mapTitle}</h3>
+                {/* 💡 修正點 7：附近推薦機構的小標題也改為 text-center 置中 */}
+                <h3 className="text-lg md:text-xl font-black text-[#4A3F6B] mb-5 opacity-90 text-center">{currentT.mapTitle}</h3>
+                
+                {/* 醫院清單卡片部分：外框對稱，但內部文字（如地址）保持左對齊便於常輩與使用者快速掃視 */}
                 <div className="grid gap-4 md:gap-5">
                   {hospitals.map((h: any, i: number) => (
                     <div key={i} className="p-4 md:p-7 bg-white/80 rounded-[1.25rem] md:rounded-[2rem] hover:bg-white transition-all shadow-sm group border border-[#E2DCD0]">
@@ -217,7 +229,7 @@ export default function Home() {
                       </div>
                       
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mt-3 sm:mt-4 gap-3 sm:gap-4">
-                        <div className="text-xs md:text-sm text-gray-500 w-full sm:max-w-[75%] break-words">{h.address}</div>
+                        <div className="text-xs md:text-sm text-gray-500 w-full sm:max-w-[75%] break-words text-left">{h.address}</div>
                         <div className="bg-[#B8B2C7]/30 px-4 py-1 rounded-full text-xs md:text-sm font-black text-[#4A3F6B] whitespace-nowrap self-end sm:self-auto">
                           {currentT.distance} {h.distance || "0.0"} km
                         </div>
@@ -226,12 +238,13 @@ export default function Home() {
                   ))}
                 </div>
               </div>
+
             </div>
           </div>
         )}
       </div>
 
-      {/* 💡 調整：頁尾常駐聲明已內建 text-center，這裡微調了間距讓上下對稱 */}
+      {/* 頁尾常駐聲明 */}
       <footer className="w-full text-center py-4 text-[10px] md:text-xs text-gray-400 font-medium tracking-normal opacity-70 mt-4 shrink-0">
         {currentT.footerWarning}
       </footer>
